@@ -5,10 +5,13 @@ export const useSocket = (roomId) => {
     const [calledNumbers, setCalledNumbers] = useState([]);
     const [winnerData, setWinnerData] = useState(null);
     const [isConnected, setIsConnected] = useState(false);
+    const [currentNumber, setCurrentNumber] = useState('--');
 
     useEffect(() => {
-        // WebSocket connection string (Backend URL)
-        const wsPath = `ws://localhost:8000/ws/game/${roomId}/`;
+        if (!roomId) return;
+
+        // Render Backend URL (Secure WebSocket)
+        const wsPath = `wss://tambola-s8hq.onrender.com/ws/game/${roomId}/`;
         const ws = new WebSocket(wsPath);
 
         ws.onopen = () => {
@@ -19,14 +22,13 @@ export const useSocket = (roomId) => {
         ws.onmessage = (e) => {
             const data = JSON.parse(e.data);
             
-            // Backend nundi vacche message type ni batti state update chesthundhi
             switch (data.type) {
                 case 'NEW_NUMBER':
+                    setCurrentNumber(data.number);
                     setCalledNumbers((prev) => [...prev, data.number]);
                     break;
                 
                 case 'CHAT_MESSAGE':
-                    // Winner announcements ikkade vasthayi
                     if (data.message.includes("claimed")) {
                         setWinnerData({
                             name: data.user,
@@ -46,17 +48,14 @@ export const useSocket = (roomId) => {
         };
 
         setSocket(ws);
-
-        // Component unmount ayinappudu connection close chesthundhi
         return () => ws.close();
     }, [roomId]);
 
-    // Game start cheyyadaniki helper function
     const startGame = useCallback(() => {
-        if (socket) {
-            socket.send(json.stringify({ 'action': 'START_GAME' }));
+        if (socket && isConnected) {
+            socket.send(JSON.stringify({ 'action': 'START_GAME' }));
         }
-    }, [socket]);
+    }, [socket, isConnected]);
 
-    return { socket, calledNumbers, winnerData, isConnected, startGame, setWinnerData };
+    return { socket, calledNumbers, currentNumber, winnerData, isConnected, startGame };
 };
