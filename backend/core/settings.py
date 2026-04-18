@@ -4,13 +4,8 @@ import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Security fix: Online lo secret key environment nundi raavali
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-your-secret-key-here')
-
-# Production lo DEBUG False undali, lekapothe slow avthundi
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
-
-# Render URL ni allow chestunnam
 ALLOWED_HOSTS = ['tambola-s8hq.onrender.com', 'localhost', '127.0.0.1', '.onrender.com']
 
 INSTALLED_APPS = [
@@ -29,7 +24,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware', # Static files serving kosam
+    'whitenoise.middleware.WhiteNoiseMiddleware', 
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -40,10 +35,11 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'core.urls'
 
+# --- FIXED TEMPLATES FOR OFFICIAL LINKS ---
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [os.path.join(BASE_DIR, 'frontend/build')], # IDHI KACHITHANGA UNDALI
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -59,7 +55,6 @@ TEMPLATES = [
 WSGI_APPLICATION = 'core.wsgi.application'
 ASGI_APPLICATION = 'core.asgi.application'
 
-# Database: Render Postgres vaaduthunte automatically connect avthundi
 DATABASES = {
     'default': dj_database_url.config(
         default=f'sqlite:///{BASE_DIR / "db.sqlite3"}',
@@ -67,33 +62,27 @@ DATABASES = {
     )
 }
 
-# --- CHANNEL LAYERS FIX (REDIS ON RENDER) ---
-# Localhost 127.0.0.1 badhulu Render pampinche URL vaaduthunnam
 REDIS_URL = os.environ.get('REDIS_URL')
-
 if REDIS_URL:
     CHANNEL_LAYERS = {
         'default': {
             'BACKEND': 'channels_redis.core.RedisChannelLayer',
-            'CONFIG': {
-                "hosts": [REDIS_URL],
-            },
+            'CONFIG': {"hosts": [REDIS_URL]},
         },
     }
 else:
-    # Fallback for local development
-    CHANNEL_LAYERS = {
-        'default': {
-            'BACKEND': 'channels.layers.InMemoryChannelLayer',
-        },
-    }
+    CHANNEL_LAYERS = {'default': {'BACKEND': 'channels.layers.InMemoryChannelLayer'}}
 
 CORS_ALLOW_ALL_ORIGINS = True 
 
-# Static Files Configuration
+# --- STATIC FILES CONFIG ---
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-# Whitenoise helps serving static files without Nginx
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
+# React build static files ni Django collect cheyyali
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'frontend/build/static'),
+]
+
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
