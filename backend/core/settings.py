@@ -1,38 +1,32 @@
 import os
 from pathlib import Path
+import dj_database_url # Render lo DB ki idhi help chestundi
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-your-secret-key-here'
-
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-default-key')
+DEBUG = os.environ.get('DEBUG', 'False') == 'True' # Online lo False untundi
 
 ALLOWED_HOSTS = ['*']
 
 # Application definition
 INSTALLED_APPS = [
-    'daphne', # Must be at the top
+    'daphne', 
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    
-    # Third party apps
     'channels',
     'corsheaders',
-    
-    # Local apps
     'game',
 ]
 
+# Middleware logic
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware', # Must be at the top
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware', # Static files kosam idhi add cheyyali
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -42,8 +36,6 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'core.urls'
-
-# TEMPLATES Configuration (Fixes admin.E403)
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -61,42 +53,34 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'core.wsgi.application'
-# Channels / Real-time configuration
 ASGI_APPLICATION = 'core.asgi.application'
 
-# Database (SQLite for development)
+# Database Setup (Render lo SQLITE badulu automatically Postgres ki switch avthundi)
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': dj_database_url.config(
+        default=f'sqlite:///{BASE_DIR / "db.sqlite3"}',
+        conn_max_age=600
+    )
 }
 
-# Channel Layer for WebSockets (Using Redis)
+# --- IMPORTANT: Redis Configuration for Production ---
+# Render Redis URL ni environment variable nundi teesukuntundi
+REDIS_URL = os.environ.get('REDIS_URL', 'redis://127.0.0.1:6373')
+
 CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
         'CONFIG': {
-            "hosts": [('127.0.0.1', 6373)], # Standard Redis port
+            "hosts": [REDIS_URL], 
         },
     },
 }
 
-# CORS Configuration for React
-CORS_ALLOW_ALL_ORIGINS = True # Development lo mathrame true pettali
+CORS_ALLOW_ALL_ORIGINS = True 
 
-# Password validation, Internationalization, Static files
-AUTH_PASSWORD_VALIDATORS = [
-    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
-    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
-    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
-    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
-]
+# Static files (Whitenoise tho static files serving setup)
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'UTC'
-USE_I18N = True
-USE_TZ = True
-
-STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
