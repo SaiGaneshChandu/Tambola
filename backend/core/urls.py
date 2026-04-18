@@ -6,8 +6,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/game/', include('game.urls')),
 
-    # GENUINE LINK HANDLER
-    # Ee line /Sai/1111 lanti links click chesina Not Found raakunda 
-    # direct ga React index.html ni open chesthundhi.
+    # Ee re_path valla /Sai/1111 lanti links ni Django direct ga 
+    # Frontend ki pampisthundi, error raadu.
     re_path(r'^.*$', TemplateView.as_view(template_name='index.html')),
 ]
