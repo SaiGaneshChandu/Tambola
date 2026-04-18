@@ -6,6 +6,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/game/', include('game.urls')),
     
-    # CRITICAL FIX: "Not Found" raakunda anni links ni React App ki pampisthundi
+    # Ee line valla https://domain.com/Sai/1111 ani kottina 
+    # Not Found raakunda direct ga React open avthundi.
     re_path(r'^.*$', TemplateView.as_view(template_name='index.html')),
 ]
