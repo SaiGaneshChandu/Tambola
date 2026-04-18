@@ -1,14 +1,18 @@
 import os
 from pathlib import Path
-import dj_database_url # Render lo DB ki idhi help chestundi
+import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-default-key')
-DEBUG = os.environ.get('DEBUG', 'False') == 'True' # Online lo False untundi
 
-ALLOWED_HOSTS = ['*']
+# Security fix: Online lo secret key environment nundi raavali
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-your-secret-key-here')
 
-# Application definition
+# Production lo DEBUG False undali, lekapothe slow avthundi
+DEBUG = os.environ.get('DEBUG', 'False') == 'True'
+
+# Render URL ni allow chestunnam
+ALLOWED_HOSTS = ['tambola-s8hq.onrender.com', 'localhost', '127.0.0.1', '.onrender.com']
+
 INSTALLED_APPS = [
     'daphne', 
     'django.contrib.admin',
@@ -22,11 +26,10 @@ INSTALLED_APPS = [
     'game',
 ]
 
-# Middleware logic
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware', # Static files kosam idhi add cheyyali
+    'whitenoise.middleware.WhiteNoiseMiddleware', # Static files serving kosam
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -36,6 +39,7 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'core.urls'
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -55,7 +59,7 @@ TEMPLATES = [
 WSGI_APPLICATION = 'core.wsgi.application'
 ASGI_APPLICATION = 'core.asgi.application'
 
-# Database Setup (Render lo SQLITE badulu automatically Postgres ki switch avthundi)
+# Database: Render Postgres vaaduthunte automatically connect avthundi
 DATABASES = {
     'default': dj_database_url.config(
         default=f'sqlite:///{BASE_DIR / "db.sqlite3"}',
@@ -63,24 +67,33 @@ DATABASES = {
     )
 }
 
-# --- IMPORTANT: Redis Configuration for Production ---
-# Render Redis URL ni environment variable nundi teesukuntundi
-REDIS_URL = os.environ.get('REDIS_URL', 'redis://127.0.0.1:6373')
+# --- CHANNEL LAYERS FIX (REDIS ON RENDER) ---
+# Localhost 127.0.0.1 badhulu Render pampinche URL vaaduthunnam
+REDIS_URL = os.environ.get('REDIS_URL')
 
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            "hosts": [REDIS_URL], 
+if REDIS_URL:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                "hosts": [REDIS_URL],
+            },
         },
-    },
-}
+    }
+else:
+    # Fallback for local development
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        },
+    }
 
 CORS_ALLOW_ALL_ORIGINS = True 
 
-# Static files (Whitenoise tho static files serving setup)
+# Static Files Configuration
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+# Whitenoise helps serving static files without Nginx
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
