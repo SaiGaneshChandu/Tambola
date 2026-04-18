@@ -1,53 +1,31 @@
 import random
 
-def generate_tambola_ticket():
-    """
-    Standard Tambola rules prakaaram 3x9 grid ticket generate chesthundhi.
-    - Prathi row lo exact ga 5 numbers undali.
-    - Prathi column lo range follow avvali (1-9, 10-19... 80-90).
-    """
-    # 1. Empty 3x9 grid create cheyyadam
-    ticket = [[None for _ in range(9)] for _ in range(3)]
+def generate_ticket():
+    # Standard Tambola: 9 columns, 3 rows, 15 numbers total
+    ticket = [[0 for _ in range(9)] for _ in range(3)]
+    total_numbers = 0
     
-    # 2. Prathi column ki numbers allocate cheyyadam
     for col in range(9):
+        # Column ranges: 1-9, 10-19... 80-90
         start = col * 10 + 1
-        end = (col + 1) * 10
-        if col == 0: start = 1
-        if col == 8: end = 90
+        end = (col + 1) * 10 if col < 8 else 90
         
-        # Prathi column nundi random ga 1 to 2 numbers pick cheyyali (standard rule)
-        count = random.choice([1, 2])
-        column_nums = random.sample(range(start, end + 1), count)
-        column_nums.sort()
-        
-        # Rows lo allocate cheyyadam
-        for i, val in enumerate(column_nums):
-            ticket[i][col] = val
+        # Prathi column lo కనీసం okka number undali
+        row = random.randint(0, 2)
+        ticket[row][col] = random.randint(start, end)
+        total_numbers += 1
 
-    # 3. Row constraints check (Prathi row lo exact ga 5 numbers undali)
-    for r in range(3):
-        row_indices = [i for i, val in enumerate(ticket[r]) if val is not None]
-        
-        if len(row_indices) > 5:
-            # Ekkuva unte random ga teeseyyali
-            to_remove = random.sample(row_indices, len(row_indices) - 5)
-            for idx in to_remove:
-                ticket[r][idx] = None
-        elif len(row_indices) < 5:
-            # Takkuva unte random ga fill cheyyali
-            empty_spots = [i for i, val in enumerate(ticket[r]) if val is None]
-            to_add = random.sample(empty_spots, 5 - len(row_indices))
-            for idx in to_add:
-                start = idx * 10 + 1
-                ticket[r][idx] = random.randint(start, start + 8)
-
+    # Migilina 6 numbers ni random ga fill cheyyali (total 15 avvalante)
+    while total_numbers < 15:
+        row = random.randint(0, 2)
+        col = random.randint(0, 9)
+        if ticket[row][col] == 0:
+            start = col * 10 + 1
+            end = (col + 1) * 10 if col < 8 else 90
+            num = random.randint(start, end)
+            
+            # Column lo duplicate lekunda chuskovali
+            if num not in [ticket[r][col] for r in range(3)]:
+                ticket[row][col] = num
+                total_numbers += 1
     return ticket
-
-def get_shuffled_numbers():
-    """
-    Game board kosam 1 nundi 90 varaku numbers ni shuffle chesi isthundhi.
-    """
-    numbers = list(range(1, 91))
-    random.shuffle(numbers)
-    return numbers

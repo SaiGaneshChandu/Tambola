@@ -2,92 +2,74 @@ import json
 import asyncio
 import random
 from channels.generic.websocket import AsyncWebsocketConsumer
+from .utils import generate_ticket
 
-# Room data ni memory lo store chestunnam (Production lo Redis/Database vaadali)
-rooms = {}
+class GameConsumer(AsyncWebsocketConsumer):
+    rooms = {} # Room data store cheyyడానికి
 
-class TambolaConsumer(AsyncWebsocketConsumer):
     async def connect(self):
-        self.room_id = self.scope['url_route']['kwargs']['room_id']
-        self.room_group_name = f'game_{self.room_id}'
-
-        await self.channel_layer.group_add(
-            self.room_group_name,
-            self.channel_name
-        )
+        self.room_name = self.scope['url_route']['kwargs']['room_name']
+        self.room_group_name = f'game_{self.room_name}'
+        
+        await self.channel_layer.group_add(self.room_group_name, self.channel_name)
         await self.accept()
-
-    async def disconnect(self, close_code):
-        await self.channel_layer.group_discard(
-            self.room_group_name,
-            self.channel_name
-        )
 
     async def receive(self, text_data):
         data = json.loads(text_data)
         action = data.get('action')
 
-        if action == 'CREATE_ROOM':
-            # Room configuration store cheyyadam
-            rooms[self.room_id] = {
-                'password': data.get('password'),
-                'max_players': data.get('max_players'),
+        if action == 'setup_room':
+            # Host room create chesinappudu
+            self.rooms[self.room_name] = {
+                'password': data['password'],
+                'max_players': int(data['max_players']),
+                'players': {},
                 'called_numbers': [],
-                'game_started': False
+                'is_started': False
             }
-            await self.send(text_data=json.dumps({
-                'type': 'ROOM_CREATED',
-                'message': 'Room configuration saved successfully!'
-            }))
 
-        elif action == 'START_GAME':
-            if self.room_id in rooms and not rooms[self.room_id]['game_started']:
-                rooms[self.room_id]['game_started'] = True
-                await self.start_number_calling()
-        
-        elif action == 'CLAIM_PRIZE':
-            player_name = data.get('player_name')
-            # Winner validation logic
-            # Evaru mundu 'CLAIM' request pampithe vallu random ga select avtharu (Race condition)
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {
-                    'type': 'game_message',
-                    'message': f'🎊 {player_name} claimed Full House! Checking ticket...',
-                    'user': 'System'
-                }
-            )
+        elif action == 'join_game':
+            room = self.rooms.get(self.room_name)
+            if room and room['password'] == data['password']:
+                # Player join ayithe unique ticket ivvali
+                ticket = generate_ticket()
+                room['players'][self.channel_name] = data['player_name']
+                
+                await self.send(text_data=json.dumps({
+                    'type': 'ticket_data',
+                    'ticket': ticket,
+                    'player_name': data['player_name']
+                }))
+                
+                # Player count update
+                await self.channel_layer.group_send(self.room_group_name, {
+                    'type': 'player_update',
+                    'count': len(room['players'])
+                })
 
-    async def start_number_calling(self):
+        elif action == 'start_game':
+            room = self.rooms.get(self.room_name)
+            if room and not room['is_started']:
+                room['is_started'] = True
+                asyncio.create_task(self.game_loop())
+
+    async def game_loop(self):
+        room = self.rooms.get(self.room_name)
         numbers = list(range(1, 91))
-        random.shuffle(numbers) # Randomness guaranteed
+        random.shuffle(numbers)
 
         for num in numbers:
-            # Check if game is still active
-            if self.room_id not in rooms or not rooms[self.room_id]['game_started']:
-                break
-
-            rooms[self.room_id]['called_numbers'].append(num)
+            if not room['is_started']: break
+            room['called_numbers'].append(num)
             
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {
-                    'type': 'broadcast_num',
-                    'number': num
-                }
-            )
-            # Nuvvu adiginaట్టు 2 seconds gap
-            await asyncio.sleep(2)
+            await self.channel_layer.group_send(self.room_group_name, {
+                'type': 'new_number',
+                'number': num
+            })
+            await asyncio.sleep(2) # 2 Seconds Gap
 
-    async def broadcast_num(self, event):
-        await self.send(text_data=json.dumps({
-            'type': 'NEW_NUMBER',
-            'number': event['number']
-        }))
+    async def new_number(self, event):
+        await self.send(text_data=json.dumps(event))
 
-    async def game_message(self, event):
-        await self.send(text_data=json.dumps({
-            'type': 'CHAT_MESSAGE',
-            'message': event['message'],
-            'user': event['user']
-        }))
+    async def player_update(self, event):
+        await self.send(text_data=json.dumps(event))

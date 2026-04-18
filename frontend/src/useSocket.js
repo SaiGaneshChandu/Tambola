@@ -1,61 +1,29 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-export const useSocket = (roomId) => {
-    const [socket, setSocket] = useState(null);
+export const useSocket = (roomName) => {
+    const socket = useRef(null);
+    const [lastNumber, setLastNumber] = useState('--');
     const [calledNumbers, setCalledNumbers] = useState([]);
-    const [winnerData, setWinnerData] = useState(null);
-    const [isConnected, setIsConnected] = useState(false);
-    const [currentNumber, setCurrentNumber] = useState('--');
+    const [ticket, setTicket] = useState(null);
+    const [playerCount, setPlayerCount] = useState(0);
 
     useEffect(() => {
-        if (!roomId) return;
+        socket.current = new WebSocket(`wss://tambola-s8hq.onrender.com/ws/game/${roomName}/`);
 
-        // Render Backend URL (Secure WebSocket)
-        const wsPath = `wss://tambola-s8hq.onrender.com/ws/game/${roomId}/`;
-        const ws = new WebSocket(wsPath);
-
-        ws.onopen = () => {
-            console.log("Connected to Tambola Server");
-            setIsConnected(true);
-        };
-
-        ws.onmessage = (e) => {
+        socket.current.onmessage = (e) => {
             const data = JSON.parse(e.data);
-            
-            switch (data.type) {
-                case 'NEW_NUMBER':
-                    setCurrentNumber(data.number);
-                    setCalledNumbers((prev) => [...prev, data.number]);
-                    break;
-                
-                case 'CHAT_MESSAGE':
-                    if (data.message.includes("claimed")) {
-                        setWinnerData({
-                            name: data.user,
-                            message: data.message
-                        });
-                    }
-                    break;
-
-                default:
-                    break;
+            if (data.type === 'new_number') {
+                setLastNumber(data.number);
+                setCalledNumbers(prev => [...prev, data.number]);
+            } else if (data.type === 'ticket_data') {
+                setTicket(data.ticket);
+            } else if (data.type === 'player_update') {
+                setPlayerCount(data.count);
             }
         };
 
-        ws.onclose = () => {
-            console.log("Disconnected from Server");
-            setIsConnected(false);
-        };
+        return () => socket.current.close();
+    }, [roomName]);
 
-        setSocket(ws);
-        return () => ws.close();
-    }, [roomId]);
-
-    const startGame = useCallback(() => {
-        if (socket && isConnected) {
-            socket.send(JSON.stringify({ 'action': 'START_GAME' }));
-        }
-    }, [socket, isConnected]);
-
-    return { socket, calledNumbers, currentNumber, winnerData, isConnected, startGame };
+    return { socket, lastNumber, calledNumbers, ticket, playerCount };
 };
