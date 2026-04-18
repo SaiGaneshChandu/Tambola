@@ -35,11 +35,11 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'core.urls'
 
-# --- FIXED TEMPLATES FOR OFFICIAL LINKS ---
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [os.path.join(BASE_DIR, 'frontend/build')], # IDHI KACHITHANGA UNDALI
+        # React build folder ikkada point avvali
+        'DIRS': [os.path.join(BASE_DIR, 'frontend/build')], 
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -75,14 +75,10 @@ else:
 
 CORS_ALLOW_ALL_ORIGINS = True 
 
-# --- STATIC FILES CONFIG ---
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-
-# React build static files ni Django collect cheyyali
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'frontend/build/static'),
 ]
-
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
