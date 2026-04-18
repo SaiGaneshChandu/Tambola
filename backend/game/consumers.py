@@ -25,7 +25,6 @@ class GameConsumer(AsyncWebsocketConsumer):
                 'called_numbers': [],
                 'is_started': False
             }
-            # Host ki setup confirmation
             await self.send(text_data=json.dumps({'type': 'setup_success'}))
 
         elif action == 'join_game':
@@ -34,14 +33,12 @@ class GameConsumer(AsyncWebsocketConsumer):
                 if len(room['players']) < room['max_players']:
                     ticket = generate_ticket()
                     room['players'][self.channel_name] = data['player_name']
-                    
                     await self.send(text_data=json.dumps({
                         'type': 'ticket_data',
                         'ticket': ticket,
                         'player_name': data['player_name'],
                         'max_players': room['max_players']
                     }))
-                    
                     await self.channel_layer.group_send(self.room_group_name, {
                         'type': 'player_update',
                         'count': len(room['players']),
@@ -51,8 +48,9 @@ class GameConsumer(AsyncWebsocketConsumer):
         elif action == 'start_game':
             room = self.rooms.get(self.room_name)
             if room and len(room['players']) >= room['max_players']:
-                room['is_started'] = True
-                asyncio.create_task(self.game_loop())
+                if not room['is_started']:
+                    room['is_started'] = True
+                    asyncio.create_task(self.game_loop())
 
     async def game_loop(self):
         room = self.rooms.get(self.room_name)
