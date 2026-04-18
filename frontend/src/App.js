@@ -5,136 +5,120 @@ function App() {
     const [view, setView] = useState('lobby'); 
     const [roomData, setRoomData] = useState({ name: '', password: '', playersLimit: 2 });
     const [joinData, setJoinData] = useState({ name: '' });
-    
+    const [playersList, setPlayersList] = useState([]); // Add aina valla list kosam
+
     const { socket, lastNumber, calledNumbers, ticket, playerCount, maxPlayers } = useSocket(roomData.name || "");
 
-    // 100% WORKING INVITE LINK DETECTOR (Like Ludo)
+    // 1. URL DETECTOR: Link click chesi vaste automatic ga identify chestundi
     useEffect(() => {
         const pathParts = window.location.pathname.split('/').filter(p => p !== "");
         if (pathParts.length >= 2) {
-            // URL format: /RoomName/Password
             setRoomData(prev => ({ ...prev, name: pathParts[0], password: pathParts[1] }));
             setView('join_screen'); 
         }
     }, []);
 
+    // 2. CREATE LINK & CHANGE URL: Browser URL ni automatic ga marustundi
     const handleCreate = () => {
-        if(!roomData.name || !roomData.password) return alert("Room Name & Password fill cheyyandi!");
+        if(!roomData.name || !roomData.password) return alert("Anni fill cheyyi!");
+        
+        // URL ni change chestundi: domain.com/name/password
+        const newUrl = `${window.location.origin}/${roomData.name}/${roomData.password}`;
+        window.history.pushState({}, '', newUrl);
+
         socket.current.send(JSON.stringify({ 
-            action: 'setup_room', password: roomData.password, max_players: roomData.playersLimit 
+            action: 'setup_room', 
+            password: roomData.password, 
+            max_players: roomData.playersLimit 
         }));
         setView('invite');
     };
 
     const handleJoin = () => {
-        if(!joinData.name) return alert("Nee Peru enter cheyyi!");
+        if(!joinData.name) return alert("Enter Name!");
         socket.current.send(JSON.stringify({ 
-            action: 'join_game', player_name: joinData.name, password: roomData.password 
+            action: 'join_game', 
+            player_name: joinData.name, 
+            password: roomData.password 
         }));
         setView('game');
     };
 
-    // --- LOBBY (Setup) ---
+    // --- 1. LOBBY SCREEN ---
     if (view === 'lobby') return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-[#0f172a] p-6 text-white">
-            <div className="bg-[#1e293b] p-10 rounded-[40px] w-full max-w-md border-t-8 border-yellow-500 shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
-                <h1 className="text-4xl font-black text-yellow-400 mb-8 text-center italic tracking-tighter">TAMBOLA 2K26</h1>
-                
-                <div className="space-y-6">
-                    <input placeholder="Room Name (e.g. Sai)" className="w-full p-5 bg-[#0f172a] rounded-2xl border border-slate-700 focus:border-yellow-500 outline-none text-lg font-bold" 
-                        onChange={e => setRoomData({...roomData, name: e.target.value.trim()})} />
-                    
-                    <input placeholder="Password (e.g. 1111)" className="w-full p-5 bg-[#0f172a] rounded-2xl border border-slate-700 focus:border-yellow-500 outline-none text-lg font-bold" 
-                        onChange={e => setRoomData({...roomData, password: e.target.value.trim()})} />
-
-                    <select className="w-full p-5 bg-[#0f172a] rounded-2xl border border-slate-700 font-bold appearance-none cursor-pointer" 
-                        onChange={e => setRoomData({...roomData, playersLimit: e.target.value})}>
-                        {[...Array(14)].map((_, i) => <option key={i+2} value={i+2}>{i+2} Players Mode</option>)}
-                    </select>
-
-                    <button onClick={handleCreate} className="w-full bg-yellow-500 py-5 rounded-2xl text-black font-black text-xl uppercase shadow-xl shadow-yellow-500/20 active:scale-95 transition-all">
-                        Create Invite Link
-                    </button>
-                </div>
+        <div className="flex flex-col items-center justify-center min-h-screen bg-[#0f172a] p-6 text-white font-sans">
+            <div className="bg-[#1e293b] p-10 rounded-[40px] w-full max-w-md border-t-8 border-yellow-500 shadow-2xl">
+                <h1 className="text-4xl font-black text-yellow-400 mb-8 text-center italic">TAMBOLA 2K26</h1>
+                <input placeholder="Room Name" className="w-full p-4 mb-4 bg-[#0f172a] rounded-2xl border border-slate-700 outline-none" 
+                    onChange={e => setRoomData({...roomData, name: e.target.value.trim()})} />
+                <input placeholder="Password" title="Set a password" visually-hidden="false" className="w-full p-4 mb-4 bg-[#0f172a] rounded-2xl border border-slate-700 outline-none" 
+                    onChange={e => setRoomData({...roomData, password: e.target.value.trim()})} />
+                <select className="w-full p-4 mb-8 bg-[#0f172a] rounded-2xl border border-slate-700 font-bold" 
+                    onChange={e => setRoomData({...roomData, playersLimit: e.target.value})}>
+                    {[...Array(14)].map((_, i) => <option key={i+2} value={i+2}>{i+2} Players Mode</option>)}
+                </select>
+                <button onClick={handleCreate} className="w-full bg-yellow-500 py-4 rounded-2xl text-black font-black uppercase text-lg shadow-lg">Create Invite Link</button>
             </div>
         </div>
     );
 
-    // --- INVITE (Share Screen) ---
+    // --- 2. INVITE SCREEN (With Joined Players List) ---
     if (view === 'invite') return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-[#0f172a] p-6">
             <div className="bg-[#1e293b] p-10 rounded-[40px] w-full max-w-md text-center border-b-8 border-green-500 shadow-2xl">
-                <div className="text-6xl mb-6">🎮</div>
+                <div className="text-5xl mb-4">🎮</div>
                 <h2 className="text-2xl font-black text-white mb-2">Game Room Ready!</h2>
-                <p className="text-slate-400 text-sm mb-8 font-medium">Ee link ni share cheyyi, friends direct ga join avtharu.</p>
-                
-                <div className="bg-[#0f172a] p-5 rounded-2xl mb-8 border border-slate-800 text-yellow-400 font-mono text-sm break-all shadow-inner">
+                <p className="text-slate-400 text-sm mb-6">Ee link ni share cheyyi, friends direct ga join avtharu.</p>
+                <div className="bg-[#0f172a] p-4 rounded-xl mb-6 border border-slate-800 text-yellow-400 font-mono text-xs break-all">
                     {window.location.origin}/{roomData.name}/{roomData.password}
                 </div>
                 
                 <button onClick={() => {
                     navigator.clipboard.writeText(`${window.location.origin}/${roomData.name}/${roomData.password}`);
-                    alert("Invite Link Copied!");
-                }} className="bg-white/10 text-white px-10 py-3 rounded-xl mb-10 text-xs font-black border border-white/20 uppercase tracking-widest hover:bg-white/20">
-                    COPY INVITE LINK
-                </button>
-                
-                <button onClick={() => setView('join_screen')} className="w-full bg-green-600 py-5 rounded-2xl text-white font-black text-lg uppercase shadow-lg shadow-green-500/20">
-                    Open Dashboard
-                </button>
+                    alert("Link Copied!");
+                }} className="bg-slate-800 text-white px-6 py-2 rounded-lg mb-8 text-[10px] font-black uppercase tracking-widest border border-slate-700">COPY INVITE LINK</button>
+
+                {/* JOINED PLAYERS LIST */}
+                <div className="mb-8 text-left">
+                    <h3 className="text-yellow-500 text-[10px] font-black uppercase mb-3 tracking-widest text-center">Joined Players ({playerCount}/{roomData.playersLimit})</h3>
+                    <div className="flex flex-wrap justify-center gap-2">
+                        {/* Example: Players list loop ikkada untundi */}
+                        <div className="bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-xs font-bold border border-green-500/30">You (Host)</div>
+                        {playerCount > 1 && <div className="bg-blue-500/20 text-blue-400 px-3 py-1 rounded-full text-xs font-bold border border-blue-500/30">Friend Joined!</div>}
+                    </div>
+                </div>
+
+                <button onClick={() => setView('join_screen')} className="w-full bg-green-600 py-4 rounded-2xl text-white font-black text-lg uppercase shadow-lg">Open Dashboard</button>
             </div>
         </div>
     );
 
-    // --- JOIN SCREEN (Auto-detect from Link) ---
+    // --- 3. JOIN SCREEN ---
     if (view === 'join_screen') return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-[#0f172a] p-6 text-white text-center">
             <div className="bg-[#1e293b] p-10 rounded-[40px] w-full max-w-md border-t-8 border-yellow-500 shadow-2xl">
-                <h2 className="text-3xl font-black text-yellow-400 mb-2 uppercase italic">Join {roomData.name}</h2>
-                <p className="text-xs text-slate-500 mb-10 tracking-[0.3em] font-bold uppercase">Multiplayer Dashboard</p>
-                
-                <input placeholder="Enter Your Name" className="w-full p-5 mb-10 bg-[#0f172a] rounded-2xl border border-slate-700 outline-none focus:border-yellow-500 text-lg font-bold" 
+                <h2 className="text-3xl font-black text-yellow-400 mb-6 uppercase italic">Join {roomData.name}</h2>
+                <input placeholder="Enter Your Name" className="w-full p-4 mb-8 bg-[#0f172a] rounded-2xl border border-slate-700 outline-none focus:border-yellow-500" 
                     onChange={e => setJoinData({ name: e.target.value })} />
-                
-                <button onClick={handleJoin} className="w-full bg-yellow-500 py-5 rounded-2xl text-black font-black text-xl uppercase shadow-xl shadow-yellow-500/20 active:scale-95">
-                    Join Now
-                </button>
+                <button onClick={handleJoin} className="w-full bg-yellow-500 py-4 rounded-2xl text-black font-black text-lg uppercase shadow-xl">Join Now</button>
             </div>
         </div>
     );
 
-    // --- DASHBOARD ---
+    // --- 4. GAME DASHBOARD ---
     return (
         <div className="bg-[#0f172a] min-h-screen p-4 flex flex-col items-center text-white">
             <div className="w-full max-w-2xl bg-[#1e293b] p-6 rounded-3xl border-b-4 border-yellow-500 flex justify-between items-center mb-10 shadow-2xl">
                 <div>
-                    <h4 className="text-yellow-400 font-bold text-[10px] uppercase tracking-[0.2em] mb-1">Live Game</h4>
+                    <h4 className="text-yellow-400 font-bold uppercase text-[10px] tracking-widest mb-1">Live Game</h4>
                     <p className="text-xl font-black">{playerCount} / {maxPlayers} Joined</p>
                 </div>
-                <button 
-                    disabled={playerCount < maxPlayers} 
-                    onClick={() => socket.current.send(JSON.stringify({action:'start_game'}))}
-                    className={`px-10 py-3 rounded-2xl font-black text-sm tracking-widest transition-all ${playerCount < maxPlayers ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-green-600 shadow-lg shadow-green-500/30 active:scale-95'}`}>
+                <button disabled={playerCount < maxPlayers} onClick={() => socket.current.send(JSON.stringify({action:'start_game'}))}
+                    className={`px-10 py-3 rounded-2xl font-black text-sm tracking-widest transition-all ${playerCount < maxPlayers ? 'bg-slate-800 text-slate-600' : 'bg-green-600 shadow-lg'}`}>
                     {playerCount < maxPlayers ? 'WAITING...' : 'START'}
                 </button>
             </div>
-
-            <div className="bg-[#1e293b] rounded-full w-28 h-28 flex items-center justify-center text-5xl font-black mb-12 border-4 border-yellow-500 text-yellow-400 shadow-[0_0_60px_rgba(250,204,21,0.15)] italic">
-                {lastNumber}
-            </div>
-
-            <div className="bg-[#1e293b] p-5 rounded-[35px] border border-slate-800 shadow-2xl">
-                {ticket && ticket.map((row, i) => (
-                    <div key={i} className="flex">
-                        {row.map((num, j) => (
-                            <div key={j} onClick={(e) => calledNumbers.includes(num) && (e.target.className += " bg-yellow-500 text-black scale-105 shadow-lg shadow-yellow-500/40")}
-                                className={`w-12 h-12 md:w-16 md:h-16 border border-slate-900/50 flex items-center justify-center font-black m-0.5 rounded-xl transition-all ${num === 0 ? 'bg-slate-900/30' : 'bg-[#0f172a] text-slate-500 hover:text-white cursor-pointer'}`}>
-                                {num !== 0 ? num : ""}
-                            </div>
-                        ))}
-                    </div>
-                ))}
-            </div>
+            {/* Ticket rendering logic ikkada untundi */}
         </div>
     );
 }
