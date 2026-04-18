@@ -1,11 +1,14 @@
 # backend/core/asgi.py
 import os
+import django
 from django.core.asgi import get_asgi_application
-from channels.routing import ProtocolTypeRouter, URLRouter
-from channels.auth import AuthMiddlewareStack
-import game.routing # Idhi kachithanga undali
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings')
+django.setup() # Add this line
+
+from channels.auth import AuthMiddlewareStack
+from channels.routing import ProtocolTypeRouter, URLRouter
+import game.routing 
 
 application = ProtocolTypeRouter({
     "http": get_asgi_application(),
