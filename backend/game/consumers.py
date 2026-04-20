@@ -1,95 +1,86 @@
-import json
-import asyncio
-import random
-from channels.generic.websocket import AsyncWebsocketConsumer
-from .utils import generate_ticket
+import React, { useState, useEffect } from 'react';
+import { useSocket } from './useSocket';
 
-class GameConsumer(AsyncWebsocketConsumer):
-    # Idhi memory lo rooms data ni save chesthundhi
-    rooms = {} 
+function App() {
+    const [page, setPage] = useState('home'); 
+    const [roomData, setRoomData] = useState({ name: '', password: '', playersLimit: 2 });
+    const [joinData, setJoinData] = useState({ name: '', isJoined: false });
+    
+    // Custom hook to manage WebSocket connection
+    const { socket, lastNumber, ticket, playerCount, maxPlayers, playersList } = useSocket(roomData.name || "");
 
-    async def connect(self):
-        # URL nundi room_name ni dynamic ga collect chesthundhi
-        self.room_name = self.scope['url_route']['kwargs']['room_name']
-        self.room_group_name = f'game_{self.room_name}'
+    // EFFECT: Detect Room from URL (e.g., domain.com/jj/1)
+    useEffect(() => {
+        const path = window.location.pathname.split('/').filter(p => p !== "");
+        if (path.length >= 2) {
+            setRoomData({ name: path[0], password: path[1], playersLimit: 2 });
+            setPage('game_room'); 
+        }
+    }, []);
 
-        # Group lo join avvadam
-        await self.channel_layer.group_add(self.room_group_name, self.channel_name)
-        await self.accept()
+    const handleCreate = () => {
+        if(!roomData.name || !roomData.password) return alert("Enter Room Details");
+        
+        // Update URL without reloading: domain.com/roomname/password
+        const newUrl = `${window.location.origin}/${roomData.name}/${roomData.password}`;
+        window.history.pushState({}, '', newUrl);
 
-    async def disconnect(self, close_code):
-        # Player disconnect ayithe group nundi remove cheyyali
-        await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
+        socket.current.send(JSON.stringify({ 
+            action: 'setup_room', password: roomData.password, max_players: roomData.playersLimit 
+        }));
+        setPage('game_room');
+    };
 
-    async def receive(self, text_data):
-        data = json.loads(text_data)
-        action = data.get('action')
+    const handleJoin = () => {
+        if(!joinData.name) return alert("Enter Name");
+        socket.current.send(JSON.stringify({ 
+            action: 'join_game', player_name: joinData.name, password: roomData.password 
+        }));
+        setJoinData({ ...joinData, isJoined: true });
+    };
 
-        # 1. Host room create chesinappudu
-        if action == 'setup_room':
-            self.rooms[self.room_name] = {
-                'password': data['password'],
-                'max_players': int(data['max_players']),
-                'players': {}, # channel_name: player_name
-                'called_numbers': [],
-                'is_started': False
-            }
-            print(f"Room Created: {self.room_name} for {data['max_players']} players")
+    if (page === 'home') return (
+        <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 text-white font-sans">
+            <div className="bg-slate-900 p-10 rounded-3xl w-full max-w-md border-t-4 border-yellow-500 shadow-2xl">
+                <h1 className="text-3xl font-bold text-yellow-500 mb-8 text-center italic">TAMBOLA LIVE</h1>
+                <input placeholder="Room Name" className="w-full p-4 mb-4 bg-black rounded-xl border border-slate-800" 
+                    onChange={e => setRoomData({...roomData, name: e.target.value.trim()})} />
+                <input placeholder="Password" className="w-full p-4 mb-6 bg-black rounded-xl border border-slate-800" 
+                    onChange={e => setRoomData({...roomData, password: e.target.value.trim()})} />
+                <button onClick={handleCreate} className="w-full bg-yellow-500 py-4 rounded-xl text-black font-bold uppercase hover:bg-yellow-400">Create Room</button>
+            </div>
+        </div>
+    );
 
-        # 2. Player link click chesi join ayinappudu
-        elif action == 'join_game':
-            room = self.rooms.get(self.room_name)
-            
-            if room and room['password'] == data['password']:
-                if len(room['players']) < room['max_players']:
-                    # Ticket generate chesi player details store cheyyali
-                    ticket = generate_ticket()
-                    room['players'][self.channel_name] = data['player_name']
-                    
-                    # Player ki matrame ticket pampali
-                    await self.send(text_data=json.dumps({
-                        'type': 'ticket_data',
-                        'ticket': ticket,
-                        'max_players': room['max_players']
-                    }))
-                    
-                    # Group ki player update pampali
-                    await self.channel_layer.group_send(self.room_group_name, {
-                        'type': 'player_update',
-                        'count': len(room['players']),
-                        'max_players': room['max_players']
-                    })
-            else:
-                await self.send(text_data=json.dumps({'type': 'error', 'message': 'Invalid Password or Room!'}))
+    return (
+        <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 p-6 text-white">
+            {!joinData.isJoined ? (
+                <div className="bg-slate-900 p-10 rounded-3xl w-full max-w-md border-t-4 border-yellow-500 shadow-2xl text-center">
+                    <h2 className="text-2xl font-bold text-yellow-500 mb-6 uppercase italic">{roomData.name} Lobby</h2>
+                    <input placeholder="Your Player Name" className="w-full p-4 mb-8 bg-black rounded-xl border border-slate-800" 
+                        onChange={e => setJoinData({ ...joinData, name: e.target.value })} />
+                    <button onClick={handleJoin} className="w-full bg-yellow-500 py-4 rounded-xl text-black font-bold uppercase shadow-xl">Join Now</button>
+                </div>
+            ) : (
+                <div className="w-full max-w-2xl bg-slate-900 p-8 rounded-3xl border-b-4 border-yellow-500 shadow-2xl">
+                    <div className="flex justify-between items-center mb-8">
+                        <h4 className="text-yellow-500 font-bold uppercase tracking-widest text-sm">Players ({playerCount}/{maxPlayers})</h4>
+                        <button disabled={playerCount < maxPlayers} onClick={() => socket.current.send(JSON.stringify({action:'start_game'}))}
+                            className={`px-6 py-2 rounded-xl font-bold ${playerCount < maxPlayers ? 'bg-slate-800 text-slate-500' : 'bg-green-600'}`}>
+                            {playerCount < maxPlayers ? 'WAITING' : 'START GAME'}
+                        </button>
+                    </div>
 
-        # 3. Game Start Logic
-        elif action == 'start_game':
-            room = self.rooms.get(self.room_name)
-            if room and len(room['players']) >= room['max_players']:
-                if not room['is_started']:
-                    room['is_started'] = True
-                    asyncio.create_task(self.game_loop())
+                    {/* LIVE PLAYERS GRID */}
+                    <div className="grid grid-cols-2 gap-3 mb-8">
+                        {playersList && playersList.map((player, idx) => (
+                            <div key={idx} className="bg-black p-3 rounded-xl border border-slate-800 flex items-center gap-3">
+                                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                                <span className="text-sm font-semibold">{player}</span>
+                            </div>
+                        ))}
+                    </div>
 
-    async def game_loop(self):
-        room = self.rooms.get(self.room_name)
-        numbers = list(range(1, 91))
-        random.shuffle(numbers)
-
-        for num in numbers:
-            # Room close ayina leda game aagipoyina loop stop avvali
-            if self.room_name not in self.rooms or not room['is_started']:
-                break
-                
-            room['called_numbers'].append(num)
-            await self.channel_layer.group_send(self.room_group_name, {
-                'type': 'new_number',
-                'number': num
-            })
-            await asyncio.sleep(2) # 2 seconds gap
-
-    # Helper functions for group messages
-    async def new_number(self, event):
-        await self.send(text_data=json.dumps(event))
-
-    async def player_update(self, event):
-        await self.send(text_data=json.dumps(event))
+                    <div className="bg-black p-4 rounded-xl border border-slate-800 text-center text-xs">
+                        <p className="text-slate-500 mb-2 uppercase">Invite Friends</p>
+                        <p className="text-yellow-

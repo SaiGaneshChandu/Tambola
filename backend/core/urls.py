@@ -6,7 +6,6 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/game/', include('game.urls')),
     
-    # Ee line valla https://domain.com/Sai/1111 ani kottina 
-    # Not Found raakunda direct ga React open avthundi.
+    # CATCH-ALL ROUTE: This fixes the "Not Found" error on direct link access
     re_path(r'^.*$', TemplateView.as_view(template_name='index.html')),
 ]
