@@ -34,12 +34,12 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'core.urls'
+import os
 
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        # React build folder ikkada point avvali
-        'DIRS': [os.path.join(BASE_DIR, 'frontend/build')], 
+        'DIRS': [os.path.join(BASE_DIR, 'frontend', 'build')], # MUST MATCH BUILD FOLDER
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -53,6 +53,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'core.wsgi.application'
+# Add or update this line:
 ASGI_APPLICATION = 'core.asgi.application'
 
 DATABASES = {
@@ -82,3 +83,11 @@ STATICFILES_DIRS = [
 ]
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [os.environ.get('REDIS_URL', 'redis://localhost:6337')],
+        },
+    },
+}
